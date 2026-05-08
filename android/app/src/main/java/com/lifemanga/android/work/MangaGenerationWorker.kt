@@ -39,15 +39,22 @@ class MangaGenerationWorker(
         val azureDeployment = inputData.getString(KEY_AZURE_DEPLOYMENT).orEmpty()
         val azureApiVersion = inputData.getString(KEY_AZURE_API_VERSION) ?: "2024-02-01"
 
-        if (inputPaths.isEmpty()) return@withContext failure("未提供输入图")
-
         val style = MangaStyle.fromKey(styleKey) ?: return@withContext failure("未知风格 $styleKey")
         val bubble = BubbleMode.fromKey(bubbleKey) ?: BubbleMode.CHINESE
         val endpointType = EndpointType.fromKey(endpointKey) ?: EndpointType.OPENAI
         val config = EndpointConfig(endpointType, azureEndpoint, azureDeployment, azureApiVersion)
 
-        val inputBytes = inputPaths.mapNotNull { ImageCompression.compressFileToJpeg(it) }
-        if (inputBytes.isEmpty()) return@withContext failure("输入图压缩失败")
+        if (endpointType == EndpointType.OPENAI && inputPaths.isEmpty()) {
+            return@withContext failure("未提供输入图")
+        }
+
+        val inputBytes = if (endpointType == EndpointType.AZURE) {
+            emptyList()
+        } else {
+            val bytes = inputPaths.mapNotNull { ImageCompression.compressFileToJpeg(it) }
+            if (bytes.isEmpty()) return@withContext failure("输入图压缩失败")
+            bytes
+        }
 
         setForegroundCompat("等待图像生成（1~3 分钟，锁屏不影响）")
 

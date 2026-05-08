@@ -8,6 +8,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.lifemanga.android.ServiceLocator
 import com.lifemanga.android.data.AppSettings
+import com.lifemanga.android.data.EndpointType
 import com.lifemanga.android.data.MangaStyle
 import com.lifemanga.android.work.MangaGenerationWorker
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +31,7 @@ data class CreateUiState(
     val hasApiKey: Boolean = false,
     val isGenerating: Boolean = false,
     val toast: String? = null,
+    val endpointType: EndpointType = EndpointType.OPENAI,
 )
 
 class CreateViewModel : ViewModel() {
@@ -65,6 +67,7 @@ class CreateViewModel : ViewModel() {
             hasApiKey = has,
             isGenerating = gt.first,
             toast = gt.second,
+            endpointType = settings.endpointConfig.type,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CreateUiState())
 
@@ -96,8 +99,8 @@ class CreateViewModel : ViewModel() {
             toastFlow.value = "先去设置页填 API Key"
             return
         }
-        if (state.pickedImagePaths.isEmpty()) {
-            toastFlow.value = "至少选一张参考图"
+        if (state.endpointType == EndpointType.OPENAI && state.pickedImagePaths.isEmpty()) {
+            toastFlow.value = "OpenAI 直连需要至少选一张参考图"
             return
         }
         if (state.isGenerating) {

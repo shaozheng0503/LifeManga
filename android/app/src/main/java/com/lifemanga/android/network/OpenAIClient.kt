@@ -16,11 +16,14 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
+private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
+
 class OpenAIClient(private val secureStore: SecureStore) {
 
     private val moshi: Moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
     private val responseAdapter = moshi.adapter(ImagesEditResponse::class.java)
     private val errorAdapter = moshi.adapter(ApiErrorEnvelope::class.java)
+    private val generationsRequestAdapter = moshi.adapter(ImagesGenerationsRequest::class.java)
 
     private val httpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -30,7 +33,8 @@ class OpenAIClient(private val secureStore: SecureStore) {
         .build()
 
     /**
-     * 调用 gpt-image-2 的 images/edits 接口（支持 OpenAI 直连或 Azure 部署）。返回 PNG 字节。
+     * OpenAI 直连 → images/edits（需要参考图）。
+     * Azure 部署 → images/generations（纯文字 prompt，不需要参考图）。
      * 永不自动重试 —— 长 GPU 任务，重试可能重复扣费。
      */
     @Throws(OpenAIException::class)
@@ -47,61 +51,81 @@ class OpenAIClient(private val secureStore: SecureStore) {
         val apiKey = secureStore.apiKey?.takeIf { it.isNotBlank() }
             ?: throw OpenAIException("还没填 API Key，去设置页填一下")
 
-        require(inputImageBytes.isNotEmpty()) { "至少需要一张参考图" }
-
         if (config.isAzure && !config.isAzureReady) {
             throw OpenAIException("Azure 模式需要填 endpoint / deployment / api-version")
         }
 
-        val url = when (config.type) {
-            EndpointType.OPENAI -> "https://api.openai.com/v1/images/edits"
-            EndpointType.AZURE -> buildString {
-                append(config.azureEndpoint.trimEnd('/'))
-                append("/openai/deployments/")
-                append(config.azureDeployment)
-                append("/images/edits?api-version=")
-                append(config.azureApiVersion)
-            }
-        }
-
         val combinedPrompt = buildPrompt(style, bubbleMode, userPrompt, isColor)
 
+        return if (config.type == EndpointType.AZURE) {
+            generateAzure(config, apiKey, combinedPrompt, size, quality)
+        } else {
+            if (inputImageBytes.isEmpty()) throw OpenAIException("至少需要一张参考图")
+            generateOpenAIEdits(config, apiKey, combinedPrompt, inputImageBytes, size, quality)
+        }
+    }
+
+    private fun generateAzure(
+        config: EndpointConfig,
+        apiKey: String,
+        prompt: String,
+        size: String,
+        quality: String,
+    ): ByteArray {
+        val url = buildString {
+            append(config.azureEndpoint.trimEnd('/'))
+            append("/openai/deployments/")
+            append(config.azureDeployment)
+            append("/images/generations?api-version=")
+            append(config.azureApiVersion)
+        }
+        val body = generationsRequestAdapter.toJson(
+            ImagesGenerationsRequest(prompt = prompt, size = size, quality = quality)
+        ).toRequestBody(JSON_MEDIA)
+        val request = Request.Builder()
+            .url(url)
+            .header("api-key", apiKey)
+            .header("Authorization", "Bearer $apiKey")
+            .post(body)
+            .build()
+        return executeAndParse(request)
+    }
+
+    private fun generateOpenAIEdits(
+        config: EndpointConfig,
+        apiKey: String,
+        prompt: String,
+        inputImageBytes: List<ByteArray>,
+        size: String,
+        quality: String,
+    ): ByteArray {
         val builder = MultipartBody.Builder().setType(MultipartBody.FORM)
-            .addFormDataPart("prompt", combinedPrompt)
+            .addFormDataPart("prompt", prompt)
+            .addFormDataPart("model", "gpt-image-2")
             .addFormDataPart("n", "1")
             .addFormDataPart("size", size)
             .addFormDataPart("quality", quality)
             .addFormDataPart("output_format", "png")
-
-        if (config.type == EndpointType.OPENAI) {
-            builder.addFormDataPart("model", "gpt-image-2")
-        }
-
         inputImageBytes.forEachIndexed { idx, bytes ->
             builder.addFormDataPart(
-                "image[]",
-                "input_$idx.jpg",
+                "image[]", "input_$idx.jpg",
                 bytes.toRequestBody("image/jpeg".toMediaType()),
             )
         }
-
         val request = Request.Builder()
-            .url(url)
+            .url("https://api.openai.com/v1/images/edits")
             .header("Authorization", "Bearer $apiKey")
-            .apply {
-                if (config.type == EndpointType.AZURE) {
-                    header("api-key", apiKey)
-                }
-            }
             .post(builder.build())
             .build()
+        return executeAndParse(request)
+    }
 
+    private fun executeAndParse(request: Request): ByteArray {
         val response = try {
             httpClient.newCall(request).execute()
         } catch (e: IOException) {
             throw OpenAIException("网络异常：${e.message ?: e.javaClass.simpleName}", cause = e)
         }
-
         response.use { resp ->
             val bodyString = resp.body?.string().orEmpty()
             if (!resp.isSuccessful) {
@@ -117,13 +141,9 @@ class OpenAIClient(private val secureStore: SecureStore) {
             val first = data?.data?.firstOrNull()
                 ?: throw OpenAIException("返回数据格式异常")
             val b64 = first.b64_json
-            if (!b64.isNullOrBlank()) {
-                return Base64.decode(b64, Base64.DEFAULT)
-            }
+            if (!b64.isNullOrBlank()) return Base64.decode(b64, Base64.DEFAULT)
             val urlOut = first.url
-            if (!urlOut.isNullOrBlank()) {
-                return downloadUrl(urlOut)
-            }
+            if (!urlOut.isNullOrBlank()) return downloadUrl(urlOut)
             throw OpenAIException("返回里既没 b64_json 也没 url")
         }
     }

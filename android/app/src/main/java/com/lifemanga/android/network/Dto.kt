@@ -25,3 +25,12 @@ data class ApiError(
 data class ApiErrorEnvelope(
     val error: ApiError?,
 )
+
+@JsonClass(generateAdapter = true)
+data class ImagesGenerationsRequest(
+    val prompt: String,
+    val n: Int = 1,
+    val size: String = "1024x1024",
+    val quality: String = "medium",
+    val output_format: String = "png",
+)

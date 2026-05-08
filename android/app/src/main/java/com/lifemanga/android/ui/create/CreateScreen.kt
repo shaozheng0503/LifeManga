@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.lifemanga.android.data.EndpointType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -122,34 +123,51 @@ fun CreateScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("还没填 OpenAI API Key", style = MaterialTheme.typography.titleMedium)
-                        Text("生成需要你自己的 OpenAI Key（按调用付费）。", style = MaterialTheme.typography.bodySmall)
+                        Text("还没填 API Key", style = MaterialTheme.typography.titleMedium)
+                        Text("生成需要 API Key，去设置页填写。", style = MaterialTheme.typography.bodySmall)
                         Button(onClick = onOpenSettings) { Text("去设置") }
                     }
                 }
             }
 
-            Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("参考图（最多 6 张）", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        text = "目前 MVP 只支持从相册选图（PhotoPicker，不需要权限）。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = {
-                            pickMultiple.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                            )
-                        }) {
-                            Text("选图")
-                        }
+            if (state.endpointType == EndpointType.AZURE) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Azure 生成模式", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "当前使用 Azure OpenAI，走 images/generations 接口——只需填写提示词，无需上传参考图。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
                     }
-                    if (state.pickedImagePaths.isNotEmpty()) {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(state.pickedImagePaths, key = { it }) { path ->
-                                ImageThumb(path = path, onRemove = { vm.removeImage(path) })
+                }
+            } else {
+                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("参考图（最多 6 张）", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = "从相册选图作为参考（PhotoPicker，无需授权）。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = {
+                                pickMultiple.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                                )
+                            }) {
+                                Text("选图")
+                            }
+                        }
+                        if (state.pickedImagePaths.isNotEmpty()) {
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                items(state.pickedImagePaths, key = { it }) { path ->
+                                    ImageThumb(path = path, onRemove = { vm.removeImage(path) })
+                                }
                             }
                         }
                     }
