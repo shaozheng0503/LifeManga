@@ -168,7 +168,7 @@ class MangaGenerationWorker(
             success = true,
             message = "「${style.displayName}」已保存到历史",
         )
-        Result.success(workDataOf(KEY_RESULT_ITEM_ID to item.id))
+        return Result.success(workDataOf(KEY_RESULT_ITEM_ID to item.id))
     }
 
     private suspend fun emitLog(text: String) {
