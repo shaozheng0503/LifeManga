@@ -28,10 +28,22 @@ class MangaGenerationWorker(
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
-        NotificationHelper.ensureChannels(applicationContext)
-        setForegroundCompat("正在准备生成…")
+        try {
+            runGeneration()
+        } catch (e: Exception) {
+            val msg = "未捕获异常：${e.javaClass.simpleName}: ${e.message}"
+            android.util.Log.e("MangaWorker", msg, e)
+            emitLog(msg)
+            NotificationHelper.showResult(applicationContext, success = false, message = msg)
+            Result.failure(workDataOf(KEY_ERROR_MESSAGE to msg))
+        }
+    }
 
-        val styleKey = inputData.getString(KEY_STYLE) ?: return@withContext failure("缺少风格参数")
+    private suspend fun runGeneration(): Result {
+        NotificationHelper.ensureChannels(applicationContext)
+        emitLog("⏳ 正在初始化…")
+
+        val styleKey = inputData.getString(KEY_STYLE) ?: return failure("缺少风格参数")
         val bubbleKey = inputData.getString(KEY_BUBBLE) ?: BubbleMode.CHINESE.key
         val userPrompt = inputData.getString(KEY_USER_PROMPT).orEmpty()
         val storyPrompt = inputData.getString(KEY_STORY_PROMPT).orEmpty()
@@ -45,8 +57,11 @@ class MangaGenerationWorker(
         val comfyApiKey = inputData.getString(KEY_COMFY_API_KEY)
             ?: ServiceLocator.secureStore.comfyApiKey.orEmpty()
 
-        val style = MangaStyle.fromKey(styleKey) ?: return@withContext failure("未知风格 $styleKey")
+        val style = MangaStyle.fromKey(styleKey) ?: return failure("未知风格 $styleKey")
         val bubble = BubbleMode.fromKey(bubbleKey) ?: BubbleMode.CHINESE
+
+        emitLog("🔗 ComfyUI 地址：${comfyUrl.take(40)}…")
+        emitLog("🔑 API Key：${if (comfyApiKey.isNotBlank()) "已配置（${comfyApiKey.length} 位）" else "未配置（将以匿名请求）"}")
 
         val client = ComfyUIClient(comfyUrl, comfyApiKey)
 
@@ -58,58 +73,77 @@ class MangaGenerationWorker(
             panelCount = panelCount,
         )
         val negPrompt = MangaPrompts.buildNegativePrompt(style, isColor)
+        emitLog("📝 Prompt 生成完毕（${combinedPrompt.length} 字符）")
 
-        setForegroundCompat("上传参考图…")
-
-        val outputBytes: ByteArray = try {
-            if (inputPaths.isEmpty()) {
-                // Text-to-image
-                setForegroundCompat("文生图中（1~3 分钟）…")
-                val workflow = ComfyWorkflows.textToManga(combinedPrompt, negPrompt)
-                val promptId = client.submitWorkflow(workflow)
-                when (val result = client.pollUntilDone(promptId, 300_000)) {
-                    is ComfyResult.Success -> {
-                        val filename = result.images.firstOrNull()
-                            ?: return@withContext failure("未返回图片文件名")
-                        client.downloadImage(filename)
-                    }
-                    is ComfyResult.Failure -> return@withContext failure(result.message)
-                }
-            } else {
-                // Image-to-image with reference photos
-                setForegroundCompat("压缩参考图…")
-                val compressedList = inputPaths.mapNotNull { path ->
-                    ImageCompression.compressFileToJpeg(path)
-                }
-                if (compressedList.isEmpty()) return@withContext failure("参考图压缩失败")
-
-                setForegroundCompat("上传参考图到 ComfyUI…")
-                val uploadedNames = compressedList.mapIndexed { idx, bytes ->
-                    client.uploadImage(bytes, "ref_${idx}.jpg")
-                }
-
-                setForegroundCompat("图生图中（1~3 分钟）…")
-                val workflow = when {
-                    uploadedNames.size >= 2 -> ComfyWorkflows.multiImageToManga(uploadedNames, combinedPrompt, negPrompt)
-                    else -> ComfyWorkflows.imageToManga(uploadedNames.first(), combinedPrompt, negPrompt)
-                }
-                val promptId = client.submitWorkflow(workflow)
-                when (val result = client.pollUntilDone(promptId, 300_000)) {
-                    is ComfyResult.Success -> {
-                        val filename = result.images.firstOrNull()
-                            ?: return@withContext failure("未返回图片文件名")
-                        client.downloadImage(filename)
-                    }
-                    is ComfyResult.Failure -> return@withContext failure(result.message)
-                }
+        val outputBytes: ByteArray = if (inputPaths.isEmpty()) {
+            emitLog("🎨 文生图模式，提交 ComfyUI 工作流…")
+            val workflow = ComfyWorkflows.textToManga(combinedPrompt, negPrompt)
+            val promptId = try {
+                client.submitWorkflow(workflow)
+            } catch (e: Exception) {
+                return failure("提交工作流失败：${e.message}")
             }
-        } catch (e: Exception) {
-            val msg = e.message ?: e.javaClass.simpleName
-            NotificationHelper.showResult(applicationContext, success = false, message = msg)
-            return@withContext Result.failure(workDataOf(KEY_ERROR_MESSAGE to msg))
+            emitLog("✅ 工作流已提交，promptId=$promptId")
+            emitLog("⏳ 等待 ComfyUI 出图（最长 5 分钟）…")
+            when (val result = client.pollUntilDone(promptId, 300_000)) {
+                is ComfyResult.Success -> {
+                    val filename = result.images.firstOrNull()
+                        ?: return failure("未返回图片文件名")
+                    emitLog("🖼 出图完成，下载：$filename")
+                    try {
+                        client.downloadImage(filename)
+                    } catch (e: Exception) {
+                        return failure("下载图片失败：${e.message}")
+                    }
+                }
+                is ComfyResult.Failure -> return failure(result.message)
+            }
+        } else {
+            emitLog("🗜 压缩 ${inputPaths.size} 张参考图…")
+            val compressedList = inputPaths.mapNotNull { path ->
+                ImageCompression.compressFileToJpeg(path)
+            }
+            if (compressedList.isEmpty()) return failure("参考图压缩失败，请检查图片格式")
+
+            emitLog("⬆️ 上传参考图到 ComfyUI…")
+            val uploadedNames = try {
+                compressedList.mapIndexed { idx, bytes ->
+                    client.uploadImage(bytes, "ref_${idx}.jpg").also { name ->
+                        emitLog("  ↑ 图 ${idx + 1} → $name")
+                    }
+                }
+            } catch (e: Exception) {
+                return failure("上传图片失败：${e.message}")
+            }
+
+            emitLog("🎨 图生图模式，提交工作流…")
+            val workflow = when {
+                uploadedNames.size >= 2 -> ComfyWorkflows.multiImageToManga(uploadedNames, combinedPrompt, negPrompt)
+                else -> ComfyWorkflows.imageToManga(uploadedNames.first(), combinedPrompt, negPrompt)
+            }
+            val promptId = try {
+                client.submitWorkflow(workflow)
+            } catch (e: Exception) {
+                return failure("提交工作流失败：${e.message}")
+            }
+            emitLog("✅ 工作流已提交，promptId=$promptId")
+            emitLog("⏳ 等待 ComfyUI 出图（最长 5 分钟）…")
+            when (val result = client.pollUntilDone(promptId, 300_000)) {
+                is ComfyResult.Success -> {
+                    val filename = result.images.firstOrNull()
+                        ?: return failure("未返回图片文件名")
+                    emitLog("🖼 出图完成，下载：$filename")
+                    try {
+                        client.downloadImage(filename)
+                    } catch (e: Exception) {
+                        return failure("下载图片失败：${e.message}")
+                    }
+                }
+                is ComfyResult.Failure -> return failure(result.message)
+            }
         }
 
-        setForegroundCompat("保存到本地…")
+        emitLog("💾 保存到本地数据库…")
         val item = if (projectId != null) {
             ServiceLocator.repository.saveGeneratedForProject(
                 projectId = projectId,
@@ -128,12 +162,19 @@ class MangaGenerationWorker(
             )
         }
 
+        emitLog("✅ 完成！已保存到历史（id=${item.id.take(8)}）")
         NotificationHelper.showResult(
             applicationContext,
             success = true,
             message = "「${style.displayName}」已保存到历史",
         )
         Result.success(workDataOf(KEY_RESULT_ITEM_ID to item.id))
+    }
+
+    private suspend fun emitLog(text: String) {
+        android.util.Log.d("MangaWorker", text)
+        setProgress(workDataOf(KEY_PROGRESS to text))
+        setForegroundCompat(text)
     }
 
     private suspend fun setForegroundCompat(text: String) {
@@ -147,6 +188,7 @@ class MangaGenerationWorker(
     }
 
     private fun failure(message: String): Result {
+        android.util.Log.e("MangaWorker", "FAIL: $message")
         NotificationHelper.showResult(applicationContext, success = false, message = message)
         return Result.failure(workDataOf(KEY_ERROR_MESSAGE to message))
     }
@@ -165,6 +207,7 @@ class MangaGenerationWorker(
         const val KEY_COMFY_API_KEY = "comfy_api_key"
         const val KEY_ERROR_MESSAGE = "error_message"
         const val KEY_RESULT_ITEM_ID = "result_item_id"
+        const val KEY_PROGRESS = "progress"
 
         fun enqueue(
             context: Context,

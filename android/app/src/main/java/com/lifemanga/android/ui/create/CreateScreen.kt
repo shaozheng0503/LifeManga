@@ -5,7 +5,6 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,10 +13,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -30,8 +32,10 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -40,6 +44,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -52,7 +57,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -218,6 +225,16 @@ fun CreateScreen(
                 }
             }
 
+            // Real-time progress log
+            if (state.progressLog.isNotEmpty()) {
+                ProgressLogCard(
+                    log = state.progressLog,
+                    isGenerating = state.isGenerating,
+                    hasError = state.lastError != null,
+                    onClear = vm::clearLog,
+                )
+            }
+
             Text(
                 text = "生成走 WorkManager + 前台服务，锁屏 / 切后台不会中断。完成后系统通知会响。",
                 style = MaterialTheme.typography.bodySmall,
@@ -225,6 +242,75 @@ fun CreateScreen(
             )
 
             Spacer(Modifier.height(40.dp))
+        }
+    }
+}
+
+@Composable
+private fun ProgressLogCard(
+    log: List<String>,
+    isGenerating: Boolean,
+    hasError: Boolean,
+    onClear: () -> Unit,
+) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(log.size) {
+        if (log.isNotEmpty()) listState.animateScrollToItem(log.size - 1)
+    }
+
+    val containerColor = when {
+        hasError -> MaterialTheme.colorScheme.errorContainer
+        !isGenerating -> MaterialTheme.colorScheme.surfaceVariant
+        else -> MaterialTheme.colorScheme.secondaryContainer
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = if (isGenerating) "生成进度" else if (hasError) "生成失败" else "生成完成",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                if (!isGenerating) {
+                    TextButton(onClick = onClear) { Text("清除", style = MaterialTheme.typography.labelSmall) }
+                }
+            }
+
+            if (isGenerating) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+
+            HorizontalDivider()
+
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 40.dp, max = 240.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                items(log) { line ->
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp,
+                        ),
+                        color = if (line.startsWith("❌"))
+                            MaterialTheme.colorScheme.error
+                        else
+                            MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
         }
     }
 }
