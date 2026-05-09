@@ -123,20 +123,20 @@ fun CreateScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            if (!state.hasComfyApiKey) {
+            if (!state.hasApiKey && !state.hasComfyApiKey) {
+                // Informational only — local z_image workflow runs without any key
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 ) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("缺少 comfy.org API Key", style = MaterialTheme.typography.titleMedium)
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("提示", style = MaterialTheme.typography.titleSmall)
                         Text(
-                            text = "Wan2.5 生图节点需要 comfy.org 账号授权。\n" +
-                                "获取方式：登录 comfy.org → Account → API Keys → 创建 Key，" +
-                                "然后在设置页「ComfyUI 后端」卡片填入。",
+                            text = "当前使用本地 z_image 模型生图，无需 API Key 即可运行。\n" +
+                                "如需使用 comfy.org 云端节点（Wan2.5 等），在设置页填入 Key。",
                             style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Button(onClick = onOpenSettings) { Text("去设置填写") }
                     }
                 }
             }
@@ -218,7 +218,7 @@ fun CreateScreen(
             Button(
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp),
-                enabled = !state.isGenerating && state.hasComfyApiKey,
+                enabled = !state.isGenerating,
                 onClick = { vm.startGeneration() },
             ) {
                 if (state.isGenerating) {
