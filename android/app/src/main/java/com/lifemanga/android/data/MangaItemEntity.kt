@@ -12,6 +12,8 @@ data class MangaItemEntity(
     val isFavorite: Boolean,
     val inputImagePathsCsv: String,
     val outputImagePathsCsv: String,
+    val projectId: String? = null,
+    val storyScriptJson: String? = null,
 ) {
     val inputImagePaths: List<String>
         get() = if (inputImagePathsCsv.isBlank()) emptyList() else inputImagePathsCsv.split('|')

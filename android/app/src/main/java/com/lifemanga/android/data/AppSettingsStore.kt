@@ -3,6 +3,7 @@ package com.lifemanga.android.data
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +19,10 @@ data class AppSettings(
     val azureEndpoint: String = "",
     val azureDeployment: String = "",
     val azureApiVersion: String = "2024-02-01",
+    val comfyUiUrl: String = "https://deployment-452-2eu5fpbp-8188.550w.link",
+    val qwenUrl: String = "https://deployment-452-lwgy9ka4-8000.550w.link",
+    val storyMode: Boolean = false,
+    val panelCount: Int = 4,
 ) {
     val endpointConfig: EndpointConfig
         get() = EndpointConfig(endpointType, azureEndpoint, azureDeployment, azureApiVersion)
@@ -33,6 +38,10 @@ class AppSettingsStore(private val context: Context) {
         val AZURE_ENDPOINT = stringPreferencesKey("azure_endpoint")
         val AZURE_DEPLOYMENT = stringPreferencesKey("azure_deployment")
         val AZURE_API_VERSION = stringPreferencesKey("azure_api_version")
+        val COMFY_UI_URL = stringPreferencesKey("comfy_ui_url")
+        val QWEN_URL = stringPreferencesKey("qwen_url")
+        val STORY_MODE = booleanPreferencesKey("story_mode")
+        val PANEL_COUNT = intPreferencesKey("panel_count")
     }
 
     val flow: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -44,6 +53,10 @@ class AppSettingsStore(private val context: Context) {
             azureEndpoint = p[Keys.AZURE_ENDPOINT].orEmpty(),
             azureDeployment = p[Keys.AZURE_DEPLOYMENT].orEmpty(),
             azureApiVersion = p[Keys.AZURE_API_VERSION] ?: "2024-02-01",
+            comfyUiUrl = p[Keys.COMFY_UI_URL] ?: "https://deployment-452-2eu5fpbp-8188.550w.link",
+            qwenUrl = p[Keys.QWEN_URL] ?: "https://deployment-452-lwgy9ka4-8000.550w.link",
+            storyMode = p[Keys.STORY_MODE] ?: false,
+            panelCount = p[Keys.PANEL_COUNT] ?: 4,
         )
     }
 
@@ -73,5 +86,21 @@ class AppSettingsStore(private val context: Context) {
 
     suspend fun setAzureApiVersion(value: String) {
         context.dataStore.edit { it[Keys.AZURE_API_VERSION] = value.trim() }
+    }
+
+    suspend fun setComfyUiUrl(value: String) {
+        context.dataStore.edit { it[Keys.COMFY_UI_URL] = value.trim() }
+    }
+
+    suspend fun setQwenUrl(value: String) {
+        context.dataStore.edit { it[Keys.QWEN_URL] = value.trim() }
+    }
+
+    suspend fun setStoryMode(value: Boolean) {
+        context.dataStore.edit { it[Keys.STORY_MODE] = value }
+    }
+
+    suspend fun setPanelCount(value: Int) {
+        context.dataStore.edit { it[Keys.PANEL_COUNT] = value }
     }
 }

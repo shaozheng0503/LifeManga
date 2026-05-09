@@ -23,12 +23,27 @@ class SecureStore(context: Context) {
     private val _hasKey = MutableStateFlow(prefs.getString(KEY_API, null).isNullOrBlank().not())
     val hasKey: StateFlow<Boolean> = _hasKey.asStateFlow()
 
+    private val _hasComfyKey = MutableStateFlow(prefs.getString(KEY_COMFY_API, null).isNullOrBlank().not())
+    val hasComfyKey: StateFlow<Boolean> = _hasComfyKey.asStateFlow()
+
     var apiKey: String?
         get() = prefs.getString(KEY_API, null)
         set(value) {
             prefs.edit().putString(KEY_API, value?.takeIf { it.isNotBlank() }).apply()
             _hasKey.value = !value.isNullOrBlank()
         }
+
+    var comfyApiKey: String?
+        get() = prefs.getString(KEY_COMFY_API, null)
+        set(value) {
+            prefs.edit().putString(KEY_COMFY_API, value?.takeIf { it.isNotBlank() }).apply()
+            _hasComfyKey.value = !value.isNullOrBlank()
+        }
+
+    fun clearComfyApiKey() {
+        prefs.edit().remove(KEY_COMFY_API).apply()
+        _hasComfyKey.value = false
+    }
 
     fun clear() {
         prefs.edit().remove(KEY_API).apply()
@@ -37,5 +52,6 @@ class SecureStore(context: Context) {
 
     private companion object {
         const val KEY_API = "openai_api_key"
+        const val KEY_COMFY_API = "comfy_api_key"
     }
 }

@@ -59,6 +59,8 @@ fun SettingsScreen(
     val state by vm.uiState.collectAsState()
     var draftKey by remember { mutableStateOf("") }
     var keyVisible by remember { mutableStateOf(false) }
+    var draftComfyKey by remember { mutableStateOf("") }
+    var comfyKeyVisible by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -106,6 +108,36 @@ fun SettingsScreen(
                     }
                 },
                 onClear = { vm.clearApiKey() },
+            )
+
+            ComfyUiCard(
+                comfyUiUrl = state.settings.comfyUiUrl,
+                onUrlChange = vm::setComfyUiUrl,
+                maskedKey = state.comfyApiKeyMasked,
+                hasKey = state.hasComfyApiKey,
+                draftKey = draftComfyKey,
+                keyVisible = comfyKeyVisible,
+                onDraftChange = { draftComfyKey = it },
+                onToggleVisibility = { comfyKeyVisible = !comfyKeyVisible },
+                onSaveKey = {
+                    if (draftComfyKey.isNotBlank()) {
+                        vm.setComfyApiKey(draftComfyKey)
+                        draftComfyKey = ""
+                    }
+                },
+                onClearKey = { vm.clearComfyApiKey() },
+            )
+
+            QwenCard(
+                qwenUrl = state.settings.qwenUrl,
+                onUrlChange = vm::setQwenUrl,
+            )
+
+            StoryModeCard(
+                storyMode = state.settings.storyMode,
+                panelCount = state.settings.panelCount,
+                onStoryModeChange = vm::setStoryMode,
+                onPanelCountChange = vm::setPanelCount,
             )
 
             StyleCard(current = state.settings.style, onSelect = vm::setStyle)
@@ -167,13 +199,13 @@ private fun EndpointCard(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
-                    text = "Azure 模式下会调用 {endpoint}/openai/deployments/{deployment}/images/edits?api-version={ver}，并把 Key 同时塞到 Authorization 和 api-key header。",
+                    text = "Azure 模式：调用 {endpoint}/openai/deployments/{deployment}/images/edits?api-version={ver}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
                 Text(
-                    text = "OpenAI 直连：调用 https://api.openai.com/v1/images/edits ，需要 sk- 开头的 Key。",
+                    text = "OpenAI 直连：调用 https://api.openai.com/v1/images/edits，需要 sk- 开头的 Key。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -232,6 +264,131 @@ private fun ApiKeyCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+@Composable
+private fun ComfyUiCard(
+    comfyUiUrl: String,
+    onUrlChange: (String) -> Unit,
+    maskedKey: String,
+    hasKey: Boolean,
+    draftKey: String,
+    keyVisible: Boolean,
+    onDraftChange: (String) -> Unit,
+    onToggleVisibility: () -> Unit,
+    onSaveKey: () -> Unit,
+    onClearKey: () -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("ComfyUI 后端", style = MaterialTheme.typography.titleMedium)
+            OutlinedTextField(
+                value = comfyUiUrl,
+                onValueChange = onUrlChange,
+                label = { Text("ComfyUI URL") },
+                placeholder = { Text("https://your-comfy-instance:8188") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            HorizontalDivider()
+            Text("ComfyUI API Key（可选）", style = MaterialTheme.typography.titleSmall)
+            Text(
+                text = if (hasKey) "已保存：$maskedKey" else "未设置（公开实例可留空）",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = draftKey,
+                onValueChange = onDraftChange,
+                label = { Text("API Key") },
+                singleLine = true,
+                visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(onClick = onToggleVisibility) {
+                        Icon(
+                            imageVector = if (keyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            contentDescription = if (keyVisible) "隐藏" else "显示",
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onSaveKey, enabled = draftKey.isNotBlank()) { Text("保存") }
+                if (hasKey) {
+                    TextButton(onClick = onClearKey) { Text("清除") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QwenCard(
+    qwenUrl: String,
+    onUrlChange: (String) -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Qwen 后端", style = MaterialTheme.typography.titleMedium)
+            OutlinedTextField(
+                value = qwenUrl,
+                onValueChange = onUrlChange,
+                label = { Text("Qwen API URL") },
+                placeholder = { Text("https://your-qwen-instance:8000") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = "用于剧本模式：先由 Qwen 生成故事脚本，再由 ComfyUI 渲染各分镜。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun StoryModeCard(
+    storyMode: Boolean,
+    panelCount: Int,
+    onStoryModeChange: (Boolean) -> Unit,
+    onPanelCountChange: (Int) -> Unit,
+) {
+    val panelOptions = listOf(4, 6, 8)
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("剧本模式", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (storyMode) "先用 Qwen 生成剧本，再用 ComfyUI 渲染" else "直接用 ComfyUI 生成",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = storyMode, onCheckedChange = onStoryModeChange)
+            }
+            if (storyMode) {
+                HorizontalDivider()
+                Text("每次生成格数", style = MaterialTheme.typography.titleSmall)
+                SingleChoiceSegmentedButtonRow {
+                    panelOptions.forEachIndexed { idx, count ->
+                        SegmentedButton(
+                            selected = count == panelCount,
+                            onClick = { onPanelCountChange(count) },
+                            shape = SegmentedButtonDefaults.itemShape(idx, panelOptions.size),
+                        ) { Text("$count 格") }
+                    }
+                }
+            }
         }
     }
 }

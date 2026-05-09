@@ -1,7 +1,6 @@
 package com.lifemanga.android.ui.create
 
 import android.Manifest
-import android.content.Intent
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -57,7 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.lifemanga.android.data.EndpointType
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -130,47 +129,31 @@ fun CreateScreen(
                 }
             }
 
-            if (state.endpointType == EndpointType.AZURE) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-                ) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Azure 生成模式", style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            "当前使用 Azure OpenAI，走 images/generations 接口——只需填写提示词，无需上传参考图。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
+            Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("参考图（可选，最多 6 张）", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = "从相册选图作为风格参考（PhotoPicker，无需授权）。不选则纯文字生成。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = {
+                            pickMultiple.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                            )
+                        }) {
+                            Text("选图")
+                        }
+                    }
+                    if (state.pickedImagePaths.isNotEmpty()) {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(state.pickedImagePaths, key = { it }) { path ->
+                                ImageThumb(path = path, onRemove = { vm.removeImage(path) })
+                            }
+                        }
                     }
                 }
-            } else {
-                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("参考图（最多 6 张）", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            text = "从相册选图作为参考（PhotoPicker，无需授权）。",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = {
-                                pickMultiple.launch(
-                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-                                )
-                            }) {
-                                Text("选图")
-                            }
-                        }
-                        if (state.pickedImagePaths.isNotEmpty()) {
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                items(state.pickedImagePaths, key = { it }) { path ->
-                                    ImageThumb(path = path, onRemove = { vm.removeImage(path) })
-                                }
-                            }
-                        }
-                    }
                 }
             }
 
@@ -193,6 +176,31 @@ fun CreateScreen(
                         placeholder = { Text("\"主角戴墨镜\" \"下雨场景\" …") },
                         minLines = 2,
                     )
+                }
+            }
+
+            // Story mode extra input
+            if (state.storyMode) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("故事场景描述", style = MaterialTheme.typography.titleMedium)
+                        OutlinedTextField(
+                            value = state.storyPrompt,
+                            onValueChange = vm::setStoryPrompt,
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text("描述故事发生的场景、情节、情绪…") },
+                            minLines = 3,
+                        )
+                        Text(
+                            text = "将先用 Qwen 生成剧本（${state.panelCount} 格），再用 ComfyUI 渲染。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    }
                 }
             }
 
