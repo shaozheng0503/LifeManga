@@ -123,15 +123,20 @@ fun CreateScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            if (!state.hasApiKey) {
+            if (!state.hasComfyApiKey) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("还没填 API Key", style = MaterialTheme.typography.titleMedium)
-                        Text("生成需要 API Key，去设置页填写。", style = MaterialTheme.typography.bodySmall)
-                        Button(onClick = onOpenSettings) { Text("去设置") }
+                        Text("缺少 comfy.org API Key", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = "Wan2.5 生图节点需要 comfy.org 账号授权。\n" +
+                                "获取方式：登录 comfy.org → Account → API Keys → 创建 Key，" +
+                                "然后在设置页「ComfyUI 后端」卡片填入。",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Button(onClick = onOpenSettings) { Text("去设置填写") }
                     }
                 }
             }
@@ -213,7 +218,7 @@ fun CreateScreen(
             Button(
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp),
-                enabled = !state.isGenerating,
+                enabled = !state.isGenerating && state.hasComfyApiKey,
                 onClick = { vm.startGeneration() },
             ) {
                 if (state.isGenerating) {

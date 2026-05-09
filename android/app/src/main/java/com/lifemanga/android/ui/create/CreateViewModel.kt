@@ -29,6 +29,7 @@ data class CreateUiState(
     val style: MangaStyle = MangaStyle.SHONEN_JUMP,
     val isColor: Boolean = true,
     val hasApiKey: Boolean = false,
+    val hasComfyApiKey: Boolean = false,
     val isGenerating: Boolean = false,
     val toast: String? = null,
     val storyMode: Boolean = false,
@@ -76,20 +77,24 @@ class CreateViewModel : ViewModel() {
         GenState(generating, toast, storyPrompt, log, error)
     }
 
+    // Fold both key states together so outer combine stays at 5 flows
+    private val keysFlow = combine(secureStore.hasKey, secureStore.hasComfyKey) { k, ck -> Pair(k, ck) }
+
     val uiState: StateFlow<CreateUiState> = combine(
         pickedFlow,
         promptFlow,
         settingsStore.flow,
-        secureStore.hasKey,
+        keysFlow,
         genStateFlow,
-    ) { picked, prompt, settings: AppSettings, has, gen ->
+    ) { picked, prompt, settings: AppSettings, keys, gen ->
         CreateUiState(
             pickedImagePaths = picked,
             userPrompt = prompt,
             storyPrompt = gen.storyPrompt,
             style = settings.style,
             isColor = settings.isColor,
-            hasApiKey = has,
+            hasApiKey = keys.first,
+            hasComfyApiKey = keys.second,
             isGenerating = gen.isGenerating,
             toast = gen.toast,
             storyMode = settings.storyMode,
