@@ -14,6 +14,7 @@ data class CharacterEntity(
     val name: String,
     val bio: String,
     val sourcePhotoPath: String?,
+    val artStyle: String = CharacterArtStyle.JP_ANIME.key,
     val createdAt: Long,
     val updatedAt: Long,
 )

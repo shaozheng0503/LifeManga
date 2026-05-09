@@ -28,13 +28,19 @@ class CharacterRepository(
         characterDao.deleteCharacter(id)
     }
 
-    suspend fun createCharacter(name: String, bio: String, sourcePhotoPath: String?): CharacterEntity {
+    suspend fun createCharacter(
+        name: String,
+        bio: String,
+        sourcePhotoPath: String?,
+        artStyle: String = CharacterArtStyle.JP_ANIME.key,
+    ): CharacterEntity {
         val now = System.currentTimeMillis()
         val entity = CharacterEntity(
             id = UUID.randomUUID().toString(),
             name = name.trim(),
             bio = bio.trim(),
             sourcePhotoPath = sourcePhotoPath,
+            artStyle = artStyle,
             createdAt = now,
             updatedAt = now,
         )

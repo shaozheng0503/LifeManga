@@ -9,6 +9,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.lifemanga.android.ServiceLocator
+import com.lifemanga.android.data.CharacterArtStyle
 import com.lifemanga.android.network.ComfyUIClient
 import com.lifemanga.android.network.ComfyResult
 import com.lifemanga.android.network.ComfyWorkflows
@@ -38,12 +39,14 @@ class CharacterGenerationWorker(
             ?: return@withContext failWith("找不到角色 $characterId")
 
         val client = ComfyUIClient(comfyUrl, comfyApiKey)
+        val artStyle = CharacterArtStyle.fromKey(character.artStyle)
+        val styleTag = artStyle.promptTag
 
         val views = listOf(
-            "正面立绘" to "full-body front view character illustration, ${character.name}, ${character.bio}, manga style, clean lineart",
-            "侧面" to "side profile view character illustration, ${character.name}, ${character.bio}, manga style, clean lineart",
-            "表情包" to "character emotion expression sheet, ${character.name}, ${character.bio}, multiple facial expressions, manga style",
-            "全身服装" to "full-body outfit detail, ${character.name}, ${character.bio}, fashion illustration, manga style",
+            "正面立绘" to "full-body front view character sheet, ${character.name}, ${character.bio}, $styleTag, clean lineart, white background",
+            "侧面" to "side profile full-body character illustration, ${character.name}, ${character.bio}, $styleTag, clean lineart",
+            "表情包" to "character emotion expression sheet, ${character.name}, multiple facial expressions (happy, sad, angry, surprised, embarrassed), $styleTag",
+            "全身服装" to "full-body outfit and costume detail illustration, ${character.name}, ${character.bio}, $styleTag, fashion reference sheet",
         )
 
         for ((label, prompt) in views) {

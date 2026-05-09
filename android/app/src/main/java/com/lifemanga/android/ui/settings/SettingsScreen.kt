@@ -233,9 +233,17 @@ private fun ApiKeyCard(
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
-                text = if (hasKey) "已保存：$masked" else "尚未设置（必填）",
+                text = if (isAzure)
+                    "Azure OpenAI 资源的订阅密钥（在 Azure Portal → 你的 OpenAI 资源 → Keys and Endpoint 页面获取）。"
+                else
+                    "OpenAI 平台的 API Key，以 sk- 开头（在 platform.openai.com → API Keys 页面创建）。\n当前版本图片生成仅走 ComfyUI，此 Key 暂时备用。",
                 style = MaterialTheme.typography.bodySmall,
-                color = if (hasKey) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = if (hasKey) "已保存：$masked" else "尚未设置",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (hasKey) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             OutlinedTextField(
                 value = draftKey,
@@ -260,7 +268,7 @@ private fun ApiKeyCard(
                 }
             }
             Text(
-                text = "Key 用 EncryptedSharedPreferences 加密存设备本地，不上传不备份。",
+                text = "所有 Key 均用 EncryptedSharedPreferences 加密存设备本地，不上传不备份。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -284,6 +292,11 @@ private fun ComfyUiCard(
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("ComfyUI 后端", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "填写你的 ComfyUI 实例地址。已预填本项目默认部署地址，一般无需修改。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             OutlinedTextField(
                 value = comfyUiUrl,
                 onValueChange = onUrlChange,
@@ -293,11 +306,18 @@ private fun ComfyUiCard(
                 modifier = Modifier.fillMaxWidth(),
             )
             HorizontalDivider()
-            Text("ComfyUI API Key（可选）", style = MaterialTheme.typography.titleSmall)
+            Text("comfy.org API Key（Wan2.5 生图必填）", style = MaterialTheme.typography.titleSmall)
             Text(
-                text = if (hasKey) "已保存：$maskedKey" else "未设置（公开实例可留空）",
+                text = "Wan2.5 / Flux 等 API 节点需要 comfy.org 账号授权。\n" +
+                    "获取方式：登录 comfy.org → Account → API Keys → 创建新 Key，粘贴到这里。\n" +
+                    "注意：这是 comfy.org 的账号 Key，不是 ComfyUI 服务器密码。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = if (hasKey) "已保存：$maskedKey" else "未设置（不填无法使用 Wan2.5/Flux API 节点）",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (hasKey) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
             )
             OutlinedTextField(
                 value = draftKey,
@@ -332,19 +352,20 @@ private fun QwenCard(
 ) {
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Qwen 后端", style = MaterialTheme.typography.titleMedium)
+            Text("Qwen 后端（剧本模式）", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "仅剧本模式使用。已预填 Qwen3.5-9B vLLM 部署地址，一般无需修改。\n" +
+                    "剧本模式流程：先由 Qwen 把你的故事描述拆解成多格分镜脚本，再由 ComfyUI 逐格渲染成图。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             OutlinedTextField(
                 value = qwenUrl,
                 onValueChange = onUrlChange,
-                label = { Text("Qwen API URL") },
+                label = { Text("Qwen vLLM URL") },
                 placeholder = { Text("https://your-qwen-instance:8000") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
-            )
-            Text(
-                text = "用于剧本模式：先由 Qwen 生成故事脚本，再由 ComfyUI 渲染各分镜。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

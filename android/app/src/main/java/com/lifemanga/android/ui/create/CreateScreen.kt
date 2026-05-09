@@ -207,7 +207,7 @@ fun CreateScreen(
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp),
                 enabled = !state.isGenerating,
-                onClick = vm::startGeneration,
+                onClick = { vm.startGeneration() },
             ) {
                 if (state.isGenerating) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)

@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lifemanga.android.ServiceLocator
+import com.lifemanga.android.data.CharacterArtStyle
 import com.lifemanga.android.work.CharacterGenerationWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +19,7 @@ data class CharacterCreateState(
     val name: String = "",
     val bio: String = "",
     val photoPath: String? = null,
+    val artStyle: CharacterArtStyle = CharacterArtStyle.JP_ANIME,
     val isGenerating: Boolean = false,
     val toast: String? = null,
 )
@@ -37,6 +39,10 @@ class CharacterCreateViewModel : ViewModel() {
 
     fun setBio(v: String) {
         _uiState.update { it.copy(bio = v) }
+    }
+
+    fun setArtStyle(style: CharacterArtStyle) {
+        _uiState.update { it.copy(artStyle = style) }
     }
 
     fun addPhoto(uri: Uri) {
@@ -65,6 +71,7 @@ class CharacterCreateViewModel : ViewModel() {
                     name = state.name,
                     bio = state.bio,
                     sourcePhotoPath = state.photoPath,
+                    artStyle = state.artStyle.key,
                 )
             }
             CharacterGenerationWorker.enqueue(context, character.id)
