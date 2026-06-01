@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.lifemanga.android.ServiceLocator
 import com.lifemanga.android.data.CharacterEntity
 import com.lifemanga.android.data.CharacterViewEntity
+import com.lifemanga.android.data.ReferenceIntent
 import com.lifemanga.android.work.CharacterGenerationWorker
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -49,6 +50,22 @@ class CharacterDetailViewModel(private val characterId: String) : ViewModel() {
     fun deleteView(viewId: String) {
         viewModelScope.launch {
             repo.deleteView(viewId)
+        }
+    }
+
+    /**
+     * 把当前角色的全部视图路径塞进 [ReferenceIntent]，
+     * 配合 AppNav 的 onLoadIntoCreate 导航到工程列表，
+     * 用户挑工程进 CreateScreen 时由 CreateViewModel.init 自动消费。
+     */
+    fun loadViewsIntoReferenceIntent() {
+        viewModelScope.launch {
+            val views = repo.observeViews(characterId).first()
+            ReferenceIntent.offer(views.map { it.imagePath })
+            toastFlow.value = if (views.isEmpty())
+                "该角色还没有视图，先去生成"
+            else
+                "已为下次创作载入 ${views.size} 张角色视图"
         }
     }
 

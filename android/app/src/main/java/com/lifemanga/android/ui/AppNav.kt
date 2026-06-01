@@ -13,8 +13,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -26,6 +29,8 @@ import com.lifemanga.android.ui.characters.CharacterCreateScreen
 import com.lifemanga.android.ui.characters.CharacterDetailScreen
 import com.lifemanga.android.ui.characters.CharacterLibraryScreen
 import com.lifemanga.android.ui.create.CreateScreen
+import com.lifemanga.android.ui.create.CreateViewModel
+import com.lifemanga.android.ui.create.ReferencePickerScreen
 import com.lifemanga.android.ui.detail.DetailScreen
 import com.lifemanga.android.ui.history.HistoryScreen
 import com.lifemanga.android.ui.projects.ProjectListScreen
@@ -43,6 +48,9 @@ object Routes {
     const val DETAIL = "detail/{itemId}"
     const val CHARACTER_DETAIL = "character/{characterId}"
     const val CHARACTER_CREATE = "character_create"
+
+    // Create-time helper screens
+    const val PICK_REFERENCE = "pick_reference"
 
     fun projectDetail(id: String) = "project/$id"
     fun detail(id: String) = "detail/$id"
@@ -63,6 +71,9 @@ private val bottomTabs = listOf(
 
 /** Routes that show the bottom navigation bar */
 private val bottomNavRoutes = setOf(Routes.PROJECTS, Routes.CHARACTERS_ROOT, Routes.SETTINGS)
+
+/** Nav back stack key for "续接前一张" picker → CreateScreen 回传。 */
+internal const val KEY_PICKED_REFERENCE_PATH = "picked_reference_path"
 
 @Composable
 fun LifeMangaNavHost() {
@@ -128,10 +139,34 @@ fun LifeMangaNavHost() {
                     arguments = listOf(navArgument("projectId") { type = NavType.StringType }),
                 ) { entry ->
                     val projectId = entry.arguments?.getString("projectId").orEmpty()
-                    // Project detail reuses CreateScreen with history nav
+                    val savedState = entry.savedStateHandle
+                    val pickedPath by savedState
+                        .getStateFlow<String?>(KEY_PICKED_REFERENCE_PATH, null)
+                        .collectAsState()
+                    val vm: CreateViewModel = viewModel()
+                    LaunchedEffect(pickedPath) {
+                        if (!pickedPath.isNullOrBlank()) {
+                            vm.addImageFromPath(pickedPath!!)
+                            savedState[KEY_PICKED_REFERENCE_PATH] = null
+                        }
+                    }
                     CreateScreen(
                         onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                         onOpenHistory = { navController.navigate(Routes.HISTORY) },
+                        onPickReference = { navController.navigate(Routes.PICK_REFERENCE) },
+                    )
+                }
+
+                // 续接前一张 picker
+                composable(Routes.PICK_REFERENCE) {
+                    ReferencePickerScreen(
+                        onBack = { navController.popBackStack() },
+                        onPick = { path ->
+                            navController.previousBackStackEntry
+                                ?.savedStateHandle
+                                ?.set(KEY_PICKED_REFERENCE_PATH, path)
+                            navController.popBackStack()
+                        },
                     )
                 }
 
@@ -159,6 +194,16 @@ fun LifeMangaNavHost() {
                     CharacterDetailScreen(
                         characterId = id,
                         onBack = { navController.popBackStack() },
+                        onLoadIntoCreate = {
+                            // 角色详情不在工程上下文里，所以走"中转站"流程：
+                            //   1) 把视图路径塞进 ReferenceIntent
+                            //   2) 弹回到工程列表（用户挑工程进 CreateScreen 时由 VM 自动消费）
+                            // 这里只负责导航 + 弹一次 Snackbar，存图的事在 CharacterDetailScreen 那一侧做。
+                            navController.popBackStack(Routes.CHARACTERS_ROOT, inclusive = true)
+                            navController.navigate(Routes.PROJECTS) {
+                                popUpTo(Routes.PROJECTS) { inclusive = true }
+                            }
+                        },
                     )
                 }
 

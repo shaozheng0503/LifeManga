@@ -70,6 +70,7 @@ import coil.request.ImageRequest
 fun CreateScreen(
     onOpenSettings: () -> Unit,
     onOpenHistory: () -> Unit,
+    onPickReference: () -> Unit = {},
     vm: CreateViewModel = viewModel(),
 ) {
     val state by vm.uiState.collectAsState()
@@ -123,7 +124,7 @@ fun CreateScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            if (!state.hasApiKey && !state.hasComfyApiKey) {
+            if (!state.hasComfyApiKey) {
                 // Informational only — local z_image workflow runs without any key
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -156,6 +157,9 @@ fun CreateScreen(
                             )
                         }) {
                             Text("选图")
+                        }
+                        OutlinedButton(onClick = onPickReference) {
+                            Text("续接前一张")
                         }
                     }
                     if (state.pickedImagePaths.isNotEmpty()) {
