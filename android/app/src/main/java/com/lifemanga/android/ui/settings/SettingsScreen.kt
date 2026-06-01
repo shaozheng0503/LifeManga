@@ -47,7 +47,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lifemanga.android.data.BubbleMode
-import com.lifemanga.android.data.EndpointType
 import com.lifemanga.android.data.MangaStyle
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,8 +56,6 @@ fun SettingsScreen(
     vm: SettingsViewModel = viewModel(),
 ) {
     val state by vm.uiState.collectAsState()
-    var draftKey by remember { mutableStateOf("") }
-    var keyVisible by remember { mutableStateOf(false) }
     var draftComfyKey by remember { mutableStateOf("") }
     var comfyKeyVisible by remember { mutableStateOf(false) }
 
@@ -82,34 +79,6 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            EndpointCard(
-                currentType = state.settings.endpointType,
-                azureEndpoint = state.settings.azureEndpoint,
-                azureDeployment = state.settings.azureDeployment,
-                azureApiVersion = state.settings.azureApiVersion,
-                onTypeChange = vm::setEndpointType,
-                onEndpointChange = vm::setAzureEndpoint,
-                onDeploymentChange = vm::setAzureDeployment,
-                onApiVersionChange = vm::setAzureApiVersion,
-            )
-
-            ApiKeyCard(
-                masked = state.apiKeyMasked,
-                hasKey = state.hasApiKey,
-                draftKey = draftKey,
-                keyVisible = keyVisible,
-                isAzure = state.settings.endpointType == EndpointType.AZURE,
-                onDraftChange = { draftKey = it },
-                onToggleVisibility = { keyVisible = !keyVisible },
-                onSave = {
-                    if (draftKey.isNotBlank()) {
-                        vm.setApiKey(draftKey)
-                        draftKey = ""
-                    }
-                },
-                onClear = { vm.clearApiKey() },
-            )
-
             ComfyUiCard(
                 comfyUiUrl = state.settings.comfyUiUrl,
                 onUrlChange = vm::setComfyUiUrl,
@@ -145,133 +114,6 @@ fun SettingsScreen(
             BubbleCard(current = state.settings.bubbleMode, onSelect = vm::setBubbleMode)
 
             Spacer(Modifier.height(40.dp))
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun EndpointCard(
-    currentType: EndpointType,
-    azureEndpoint: String,
-    azureDeployment: String,
-    azureApiVersion: String,
-    onTypeChange: (EndpointType) -> Unit,
-    onEndpointChange: (String) -> Unit,
-    onDeploymentChange: (String) -> Unit,
-    onApiVersionChange: (String) -> Unit,
-) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("接口类型", style = MaterialTheme.typography.titleMedium)
-            SingleChoiceSegmentedButtonRow {
-                EndpointType.entries.forEachIndexed { idx, type ->
-                    SegmentedButton(
-                        selected = type == currentType,
-                        onClick = { onTypeChange(type) },
-                        shape = SegmentedButtonDefaults.itemShape(idx, EndpointType.entries.size),
-                    ) { Text(type.displayName) }
-                }
-            }
-            if (currentType == EndpointType.AZURE) {
-                OutlinedTextField(
-                    value = azureEndpoint,
-                    onValueChange = onEndpointChange,
-                    label = { Text("Endpoint") },
-                    placeholder = { Text("https://<resource>.cognitiveservices.azure.com") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = azureDeployment,
-                    onValueChange = onDeploymentChange,
-                    label = { Text("Deployment 名称") },
-                    placeholder = { Text("gpt-image-2-…") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                OutlinedTextField(
-                    value = azureApiVersion,
-                    onValueChange = onApiVersionChange,
-                    label = { Text("API Version") },
-                    placeholder = { Text("2024-02-01") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Text(
-                    text = "Azure 模式：调用 {endpoint}/openai/deployments/{deployment}/images/edits?api-version={ver}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                Text(
-                    text = "OpenAI 直连：调用 https://api.openai.com/v1/images/edits，需要 sk- 开头的 Key。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ApiKeyCard(
-    masked: String,
-    hasKey: Boolean,
-    draftKey: String,
-    keyVisible: Boolean,
-    isAzure: Boolean,
-    onDraftChange: (String) -> Unit,
-    onToggleVisibility: () -> Unit,
-    onSave: () -> Unit,
-    onClear: () -> Unit,
-) {
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = if (isAzure) "Azure API Key" else "OpenAI API Key",
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                text = if (isAzure)
-                    "Azure OpenAI 资源的订阅密钥（在 Azure Portal → 你的 OpenAI 资源 → Keys and Endpoint 页面获取）。"
-                else
-                    "OpenAI 平台的 API Key，以 sk- 开头（在 platform.openai.com → API Keys 页面创建）。\n当前版本图片生成仅走 ComfyUI，此 Key 暂时备用。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = if (hasKey) "已保存：$masked" else "尚未设置",
-                style = MaterialTheme.typography.bodySmall,
-                color = if (hasKey) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            OutlinedTextField(
-                value = draftKey,
-                onValueChange = onDraftChange,
-                label = { Text(if (isAzure) "Azure subscription key" else "sk-…") },
-                singleLine = true,
-                visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                trailingIcon = {
-                    IconButton(onClick = onToggleVisibility) {
-                        Icon(
-                            imageVector = if (keyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = if (keyVisible) "隐藏" else "显示",
-                        )
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onSave, enabled = draftKey.isNotBlank()) { Text("保存") }
-                if (hasKey) {
-                    TextButton(onClick = onClear) { Text("清除") }
-                }
-            }
-            Text(
-                text = "所有 Key 均用 EncryptedSharedPreferences 加密存设备本地，不上传不备份。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }

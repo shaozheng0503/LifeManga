@@ -7,6 +7,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+/**
+ * 加密本地存储。
+ *
+ * 现阶段只有一个 Key：comfy.org 的 API Key（仅在用 comfy.org 云端节点时需要；
+ * 本地 z_image workflow 走匿名请求，留空也能跑）。
+ */
 class SecureStore(context: Context) {
     private val masterKey = MasterKey.Builder(context)
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
@@ -20,18 +26,10 @@ class SecureStore(context: Context) {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
     )
 
-    private val _hasKey = MutableStateFlow(prefs.getString(KEY_API, null).isNullOrBlank().not())
-    val hasKey: StateFlow<Boolean> = _hasKey.asStateFlow()
-
-    private val _hasComfyKey = MutableStateFlow(prefs.getString(KEY_COMFY_API, null).isNullOrBlank().not())
+    private val _hasComfyKey = MutableStateFlow(
+        prefs.getString(KEY_COMFY_API, null).isNullOrBlank().not(),
+    )
     val hasComfyKey: StateFlow<Boolean> = _hasComfyKey.asStateFlow()
-
-    var apiKey: String?
-        get() = prefs.getString(KEY_API, null)
-        set(value) {
-            prefs.edit().putString(KEY_API, value?.takeIf { it.isNotBlank() }).apply()
-            _hasKey.value = !value.isNullOrBlank()
-        }
 
     var comfyApiKey: String?
         get() = prefs.getString(KEY_COMFY_API, null)
@@ -45,13 +43,7 @@ class SecureStore(context: Context) {
         _hasComfyKey.value = false
     }
 
-    fun clear() {
-        prefs.edit().remove(KEY_API).apply()
-        _hasKey.value = false
-    }
-
     private companion object {
-        const val KEY_API = "openai_api_key"
         const val KEY_COMFY_API = "comfy_api_key"
     }
 }

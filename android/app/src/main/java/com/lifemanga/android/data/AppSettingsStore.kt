@@ -15,18 +15,11 @@ data class AppSettings(
     val style: MangaStyle = MangaStyle.SHONEN_JUMP,
     val isColor: Boolean = true,
     val bubbleMode: BubbleMode = BubbleMode.CHINESE,
-    val endpointType: EndpointType = EndpointType.OPENAI,
-    val azureEndpoint: String = "",
-    val azureDeployment: String = "",
-    val azureApiVersion: String = "2024-02-01",
     val comfyUiUrl: String = "https://deployment-452-2eu5fpbp-8188.550w.link",
     val qwenUrl: String = "https://deployment-452-lwgy9ka4-8000.550w.link",
     val storyMode: Boolean = false,
     val panelCount: Int = 4,
-) {
-    val endpointConfig: EndpointConfig
-        get() = EndpointConfig(endpointType, azureEndpoint, azureDeployment, azureApiVersion)
-}
+)
 
 class AppSettingsStore(private val context: Context) {
 
@@ -34,10 +27,6 @@ class AppSettingsStore(private val context: Context) {
         val STYLE = stringPreferencesKey("style")
         val IS_COLOR = booleanPreferencesKey("is_color")
         val BUBBLE_MODE = stringPreferencesKey("bubble_mode")
-        val ENDPOINT_TYPE = stringPreferencesKey("endpoint_type")
-        val AZURE_ENDPOINT = stringPreferencesKey("azure_endpoint")
-        val AZURE_DEPLOYMENT = stringPreferencesKey("azure_deployment")
-        val AZURE_API_VERSION = stringPreferencesKey("azure_api_version")
         val COMFY_UI_URL = stringPreferencesKey("comfy_ui_url")
         val QWEN_URL = stringPreferencesKey("qwen_url")
         val STORY_MODE = booleanPreferencesKey("story_mode")
@@ -49,10 +38,6 @@ class AppSettingsStore(private val context: Context) {
             style = MangaStyle.fromKey(p[Keys.STYLE]) ?: MangaStyle.SHONEN_JUMP,
             isColor = p[Keys.IS_COLOR] ?: true,
             bubbleMode = BubbleMode.fromKey(p[Keys.BUBBLE_MODE]) ?: BubbleMode.CHINESE,
-            endpointType = EndpointType.fromKey(p[Keys.ENDPOINT_TYPE]) ?: EndpointType.OPENAI,
-            azureEndpoint = p[Keys.AZURE_ENDPOINT].orEmpty(),
-            azureDeployment = p[Keys.AZURE_DEPLOYMENT].orEmpty(),
-            azureApiVersion = p[Keys.AZURE_API_VERSION] ?: "2024-02-01",
             comfyUiUrl = p[Keys.COMFY_UI_URL] ?: "https://deployment-452-2eu5fpbp-8188.550w.link",
             qwenUrl = p[Keys.QWEN_URL] ?: "https://deployment-452-lwgy9ka4-8000.550w.link",
             storyMode = p[Keys.STORY_MODE] ?: false,
@@ -70,22 +55,6 @@ class AppSettingsStore(private val context: Context) {
 
     suspend fun setBubbleMode(value: BubbleMode) {
         context.dataStore.edit { it[Keys.BUBBLE_MODE] = value.key }
-    }
-
-    suspend fun setEndpointType(value: EndpointType) {
-        context.dataStore.edit { it[Keys.ENDPOINT_TYPE] = value.key }
-    }
-
-    suspend fun setAzureEndpoint(value: String) {
-        context.dataStore.edit { it[Keys.AZURE_ENDPOINT] = value.trim() }
-    }
-
-    suspend fun setAzureDeployment(value: String) {
-        context.dataStore.edit { it[Keys.AZURE_DEPLOYMENT] = value.trim() }
-    }
-
-    suspend fun setAzureApiVersion(value: String) {
-        context.dataStore.edit { it[Keys.AZURE_API_VERSION] = value.trim() }
     }
 
     suspend fun setComfyUiUrl(value: String) {

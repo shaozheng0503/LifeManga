@@ -10,7 +10,6 @@ import com.lifemanga.android.data.ProjectRepository
 import com.lifemanga.android.data.Repository
 import com.lifemanga.android.data.SecureStore
 import com.lifemanga.android.network.ComfyUIClient
-import com.lifemanga.android.network.OpenAIClient
 import com.lifemanga.android.network.QwenClient
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -31,7 +30,6 @@ object ServiceLocator {
 
     val imageStorage: ImageStorage by lazy { ImageStorage(appContext) }
     val repository: Repository by lazy { Repository(database.mangaDao(), imageStorage) }
-    val openAIClient: OpenAIClient by lazy { OpenAIClient(secureStore) }
     val projectRepository: ProjectRepository by lazy {
         ProjectRepository(database.projectDao(), database.mangaDao(), imageStorage)
     }
